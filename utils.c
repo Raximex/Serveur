@@ -29,30 +29,33 @@ int init_udp_client(struct sockaddr_in* addr,int* sockfd){
 
 }
 int request(uint16_t opcode, const char* filename, const char* mode, int sockfd, struct sockaddr* addr) {
+    //the zero byte
     u_int8_t end_of_file = 0;
     int offset = 0;
-    // Calcul de la taille nécessaire pour le paquet
+    // dynamically allocate the string
     char* packet = malloc(strlen(filename) + strlen(mode) + 4 + 2);
     if (packet == NULL) {
         perror("malloc");
         return -1;
     }
 
-    // Convertir l'opcode en network byte order avant de le copier
+    // Convert to network byte
     uint16_t net_opcode = htons(opcode);
     memcpy(packet + offset, &net_opcode, sizeof(net_opcode));
     offset += sizeof(net_opcode);
 
-    // Copie du nom de fichier et du mode dans le paquet, avec terminaison nulle
+    // Copy the filename and mode
     memcpy(packet + offset, filename, strlen(filename));
     offset += strlen(filename);
-    packet[offset++] = end_of_file; // Ajouter un octet de fin pour le nom de fichier
+    //zero byte
+    packet[offset++] = end_of_file;
 
     memcpy(packet + offset, mode, strlen(mode));
     offset += strlen(mode);
-    packet[offset++] = end_of_file; // Ajouter un octet de fin pour le mode
+    //zero byte
+    packet[offset++] = end_of_file; //Increment offset so we can get the total size of the packet
 
-    // Envoyer le paquet; utiliser offset comme la longueur réelle du paquet
+    // Send the packet
     if (sendto(sockfd, packet, offset, 0, addr, sizeof(*addr)) == -1) {
         perror("[sendto]");
         free(packet); 
@@ -106,34 +109,35 @@ char* get_error_message(char* packet){
 
 }
 
-char* build_error_packet(uint16_t error_code, char* error_msg) {
+char* build_error_packet(uint16_t error_code, char* error_msg,size_t* packet_size) {
+    //The zero byte
     u_int8_t end_of_error_msg = 0;
-    // Ajustez la taille du paquet pour inclure le byte de terminaison nulle
-    size_t packet_size = strlen(error_msg) + 5 + 1; // +1 pour le byte de terminaison nulle
-    char* error_packet = malloc(packet_size);
+    //dynamically allocate the string
+    char* error_packet = malloc(strlen(error_msg) + 5 + 1);
     if (error_packet == NULL) {
         perror("malloc");
         return NULL;
     }
     int offset = 0;
-    uint16_t net_opcode = htons(ERROR); // Assurez-vous que ERROR est défini à 5
-    uint16_t net_error_code = htons(error_code); // Conversion en network byte order
+    // Conversion en network byte order
+    uint16_t net_opcode = htons(ERROR); 
+    uint16_t net_error_code = htons(error_code); 
     
-    // Copie de l'opcode en network byte order
+    // copy of opcode
     memcpy(error_packet + offset, &net_opcode, sizeof(net_opcode));
     offset += sizeof(net_opcode);
 
-    // Copie du code d'erreur en network byte order
+    // copy of error code
     memcpy(error_packet + offset, &net_error_code, sizeof(net_error_code));
     offset += sizeof(net_error_code);
 
-    // Copie du message d'erreur et ajout du byte de terminaison nulle
+    // copy of error message 
     memcpy(error_packet + offset, error_msg, strlen(error_msg));
-    offset += strlen(error_msg); // Pas besoin d'incrémenter offset ici pour le byte nul
+    offset += strlen(error_msg); 
 
-    // Ajout du byte de terminaison nulle
-    error_packet[offset] = end_of_error_msg; 
-    
+    // adding the zero byte
+    error_packet[offset++] = end_of_error_msg; //incrementing offset to get the real size
+    *packet_size = offset; //assign the size
     return error_packet;
 }
 int handle_request(char* packet, struct sockaddr_in* client_addr,int sockfd){
@@ -160,8 +164,9 @@ int handle_rrq(char* packet,struct sockaddr_in* client_addr,int sockfd){
     }
     if(requested_file == NULL){
         // le fichier n'existe pas on crée le Error packet
-        char* error_packet = build_error_packet(FILE_NOT_FOUND,"le fichier est introuvable\n");
-        if (sendto(sockfd, error_packet, strlen(error_packet), 0, (struct sockaddr*)client_addr, sizeof(*client_addr)) == -1) {
+        size_t packet_size ;
+        char* error_packet = build_error_packet(FILE_NOT_FOUND,"le fichier est introuvable",&packet_size);
+        if (sendto(sockfd, error_packet, packet_size, 0, (struct sockaddr*)client_addr, sizeof(*client_addr)) == -1) {
             perror("[sendto]");
             free(error_packet); 
         return -1;

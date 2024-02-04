@@ -209,7 +209,7 @@ void print_error_packet(char* packet);
  * @param packet The TFTP packet from which to extract the informations.
  * @return Nothing
  */
-char* build_error_packet(uint16_t error_code,char* error_msg);
+char* build_error_packet(uint16_t error_code, char* error_msg,size_t* packet_size);
 
 //TODO
 int handle_request(char* packet, struct sockaddr_in* client_addr,int sockfd);
