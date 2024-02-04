@@ -28,66 +28,64 @@ int init_udp_client(struct sockaddr_in* addr,int* sockfd){
     return 0;
 
 }
-int rrq(const char* filename,const char* mode,int sockfd,struct sockaddr* addr){
-    u_int16_t opcode = 1;
+int request(int type,const char* filename, const char* mode, int sockfd, struct sockaddr* addr) {
+    u_int16_t opcode = htons(type); // Convert opcode to network byte order
     u_int8_t end_of_file = 0;
     int offset = 0;
-    char packet[512];
-    memcpy(packet,&opcode,2);
-    offset+=2;
-    memcpy(packet+offset,filename,strlen(filename));
-    offset+=strlen(filename);
-    memcpy(packet+offset,&end_of_file,1);
-    offset+=1;
-    memcpy(packet+offset,mode,strlen(mode));
-    offset+=strlen(mode);
-    memcpy(packet+offset,&end_of_file,1);
-    if(sendto(sockfd,packet,512,MSG_WAITALL,addr,sizeof(*addr))==-1){
-        perror("[sendto]");
+    // Allocate enough memory to include the opcode, filename, mode, and zero terminators
+    char* packet = malloc(strlen(filename) + strlen(mode) + 4 + 2);
+    if (packet == NULL) {
+        perror("malloc");
         return -1;
     }
-    return 1;
-}
-int wrq(const char* filename,const char* mode,int sockfd,struct sockaddr* addr){
-    u_int16_t opcode = 2;
-    u_int8_t end_of_file = 0;
-    int offset = 0;
-    char packet[512];
-    memcpy(packet,&opcode,2);
-    offset+=2;
-    memcpy(packet+offset,filename,strlen(filename));
-    offset+=strlen(filename);
-    memcpy(packet+offset,&end_of_file,1);
-    offset+=1;
-    memcpy(packet+offset,mode,strlen(mode));
-    offset+=strlen(mode);
-    memcpy(packet+offset,&end_of_file,1);
-    if(sendto(sockfd,packet,512,MSG_WAITALL,addr,sizeof(*addr))==-1){
+
+    memcpy(packet + offset, &opcode, 2);
+    offset += 2;
+    memcpy(packet + offset, filename, strlen(filename));
+    offset += strlen(filename);
+    packet[offset++] = end_of_file; // Add zero byte to terminate filename
+    memcpy(packet + offset, mode, strlen(mode));
+    offset += strlen(mode);
+    packet[offset++] = end_of_file; // Add zero byte to terminate mode
+
+    // Send the packet; use offset as the actual packet length
+    if (sendto(sockfd, packet, offset, 0, addr, sizeof(*addr)) == -1) {
         perror("[sendto]");
+        free(packet); 
         return -1;
     }
+
+    free(packet); 
     return 1;
 }
-int get_opcode(char packet[512]){
+int get_opcode(char* packet){
     return (uint16_t) packet[0];
 }
-char* get_file_name(char packet[512]){
+char* get_file_name(char* packet){
     char* buffer=strdup(packet+2);
     return buffer;
 }
-char* get_mode(char packet[512]){
+char* get_mode(char* packet){
     char* filename = get_file_name(packet);
     char* mode = strdup(packet+strlen(filename)+3);
     free(filename);
     return mode;
 }
-int handle_request(char packet[512]){
+void print_request(char* packet){
+    uint16_t opcode = get_opcode(packet);
+    char* filename = get_file_name(packet);
+    char* mode = get_mode(packet);
+    printf("%u\n",opcode);
+    printf("%s\n",filename);
+    printf("%s\n",mode);
+}
+int handle_request(char* packet){
     int opcode = get_opcode(packet);
     switch (opcode)
     {
     case RRQ:
         /* code */
-
+        handle_rrq(packet);
         break;
     case WRQ:
         /* code */
@@ -105,6 +103,7 @@ int handle_request(char packet[512]){
         break;
     }    
 
-
+}
+int handle_rrq(char* packet){
 
 }

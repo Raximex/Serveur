@@ -7,8 +7,7 @@ int main(int argc, char const* argv[])
     if(init_udp_client(&addr,&sockfd) == -1){
         printf("[init_udp_socket] : erreur");
     }
-    //rrq("hello world","netascii",sockfd,(struct sockaddr*)&addr);
-    wrq("hello world","netascii",sockfd,(struct sockaddr*)&addr);
+    request(RRQ,"hello world","netascii",sockfd,(struct sockaddr*)&addr);
     close(sockfd);
 }
 
