@@ -3,7 +3,7 @@ int main(int argc, char const* argv[])
 {
     int sockfd;
     struct sockaddr_in addr;
-
+    char* buf;
     if(init_udp_client(&addr,&sockfd) == -1){
         printf("[init_udp_socket] : erreur");
     }

@@ -11,8 +11,10 @@ int main(int argc, char**argv)
         printf("[init_udp_socket] : erreur\n");
     }
     socklen_t len = sizeof(addr);
-    int n = recvfrom(sockfd,(char* )buf,512,0,(struct sockaddr *) &client_addr,&len);
-    print_request(buf);
+    recvfrom(sockfd,(char* )buf,516,0,(struct sockaddr *) &client_addr,&len);
+    print_request_packet(buf);
+    handle_request(buf,&client_addr,sockfd);
+    
     close(sockfd);
 }
 
