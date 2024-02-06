@@ -51,7 +51,7 @@ void receive_file(const char* filename);
  * 
  * This function exits the TFTP client program.
  */
-void exit_tftp_client();
+static void exit_tftp_client();
 
 //----------------------------------------------------------------------------------------------
 /**
@@ -103,7 +103,11 @@ void set_total_retransmission_timeout(int timeout);
  * 
  * This function prints help information and usage instructions for the TFTP client.
  */
-void print_help_information();
+static void print_help_information();
+static void process_command(const char* command) ;
+static void handle_put_command() ;
+static void handle_get_command();
+static void print_help();
 
 
 

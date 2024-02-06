@@ -3,8 +3,67 @@
 static char transfer_mode[9] = "netascii";
 static int sockfd;
 static struct sockaddr_in addr;
-void exit_tftp_client(){
+static void exit_tftp_client(){
+    close(sockfd);
     exit(0);
+}
+static void print_help_information() {
+    printf(
+        "connect \tconnect to remote tftp server\n"
+        "mode    \tset file transfer mode (binary or ascii)\n"
+        "put     \tsend file to the server\n"
+        "get     \treceive file from the server\n"
+        "quit    \texit tftp client\n"
+        "verbose \ttoggle verbose mode (detailed output)\n"
+        "trace   \ttoggle packet tracing (show packet details)\n"
+        "status  \tshow current status (server, mode, etc.)\n"
+        "binary  \tset mode to octet (binary file transfer)\n"
+        "ascii   \tset mode to netascii (text file transfer)\n"
+        "rexmt   \tset per-packet retransmission timeout (in seconds)\n"
+        "timeout \tset total retransmission timeout (in seconds)\n"
+        "?       \tprint help information\n"
+        "\n"
+    );
+}
+static void process_command(const char* command) {
+    if (strcmp(command, "put") == 0) {
+        handle_put_command();
+    } else if (strcmp(command, "get") == 0) {
+        handle_get_command();
+    } else if (strcmp(command, "?") == 0) {
+        print_help();
+    } else if (strcmp(command, "quit") == 0) {
+        printf("Exiting TFTP client.\n");
+        exit(0); // Exit the program
+    } else {
+        printf("Error: Unrecognized command. Type '?' for help.\n");
+    }
+}
+
+static void handle_put_command() {
+    char filename[100];
+    printf("Enter filename to send: ");
+    scanf("%99s", filename);
+    // Assuming send_file is implemented to handle file transmission
+    send_file(filename);
+}
+
+static void handle_get_command() {
+    char filename[100];
+    printf("Enter filename to receive: ");
+    scanf("%99s", filename);
+    // Assuming receive_file is implemented to handle file reception
+    receive_file(filename);
+}
+
+static void print_help() {
+    printf(
+        "Commands available:\n"
+        "  put     \tSend file to the server\n"
+        "  get     \tReceive file from the server\n"
+        "  quit    \tExit TFTP client\n"
+        "  ?       \tPrint this help information\n"
+    );
 }
 static int connect_to_tftp_server(const char* server_ip, int server_port) {
     if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
@@ -109,7 +168,9 @@ void receive_file(const char* filename) {
         block_number++;
         // Check if this is the last data block
         if (bytes_received < 516) {
-            printf("[get] : SUCCESS\n");
+            if(DEBUG){
+                printf("[get] : SUCCESS\n");
+            }
             break;
         }
     }
@@ -158,8 +219,14 @@ int main(int argc, char const* argv[]) {
     if (connect_to_tftp_server("127.0.0.1",8080) == -1) {
         printf("[connect_to_tftp_server] : erreur");
     }
-    //receive_file("dir/filezz.txt");
-    send_file("dir/file.txt");
-    close(sockfd);
-    return 0;
+   char command[100];
+
+    while (1) {
+        printf("tftp> ");
+        if (scanf("%99s", command) == EOF) {
+            break; // Exit loop if end of input is reached
+        }
+        process_command(command);
+    }
+
 }

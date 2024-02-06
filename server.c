@@ -170,8 +170,10 @@ int main(int argc, char**argv)
     if(init_tftp_server(8080,&sockfd,&addr) == -1){
         printf("[init_udp_socket] : erreur\n");
     }
-    handle_client_requests(sockfd,&addr,&client_addr);
- 
-    close(sockfd);
+    while (1)
+    {
+     handle_client_requests(sockfd,&addr,&client_addr);
+    }
+    
 }
 
