@@ -79,7 +79,7 @@ void receive_file(const char* filename) {
     request(RRQ, filename, transfer_mode, sockfd, (struct sockaddr*)&addr);
     char buf[516];
     size_t packet_size;
-    FILE* requested_file = fopen(filename, "wb");
+    FILE* requested_file = fopen("new.txt", "wb");//pour test : il faut le remplacer par filename
     if (!requested_file) {
         perror("Failed to open file");
         return;
@@ -156,7 +156,7 @@ int main(int argc, char const* argv[]) {
     if (connect_to_tftp_server("127.0.0.1",8080) == -1) {
         printf("[connect_to_tftp_server] : erreur");
     }
-    receive_file("zebi.txt");
+    receive_file("dir/file.txt");
     
     close(sockfd);
     return 0;
