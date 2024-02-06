@@ -1,5 +1,5 @@
-#include "utils.h"
 #include "client.h"
+#define DEBUG 0
 static char transfer_mode[9] = "netascii";
 static int sockfd;
 static struct sockaddr_in addr;
@@ -65,7 +65,7 @@ static void send_file(const char* filename) {
             break;
         }
 
-        if (get_opcode(buf) == ACK && get_block_number(buf) == block_number) {
+        if (get_opcode(buf) == ACK && get_block_number(buf) == block_number && DEBUG) {
             printf("Received ACK for block %d\n", block_number);
         } else if (get_opcode(buf) == ERROR) {
             printf("[ERROR] Code = %d : Message = %s\n", get_error_code(buf), get_error_message(buf));
@@ -156,8 +156,8 @@ int main(int argc, char const* argv[]) {
     if (connect_to_tftp_server("127.0.0.1",8080) == -1) {
         printf("[connect_to_tftp_server] : erreur");
     }
-    receive_file("dir/file.txt");
-    
+    //receive_file("dir/filezz.txt");
+    send_file("dir/file.txt");
     close(sockfd);
     return 0;
 }

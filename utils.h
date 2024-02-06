@@ -102,18 +102,7 @@ enum error {
     FILE_ALREADY_EXISTS,
     NO_SUCH_USER
 };
-//--------------------------------------------------------------------------------------------------------------------------------------------------------------
-/**
- * @brief Initializes a UDP server socket.
- * 
- * This function creates a UDP socket and binds it to the specified address and port.
- * 
- * @param addr Pointer to struct sockaddr_in where server address and port are specified.
- * @param sockfd Pointer to an integer where the socket file descriptor will be stored.
- * @param port Port number to bind the server socket to.
- * @return Returns 0 on success, -1 on failure with an error message printed to stderr.
- */
-int init_udp_server(struct sockaddr_in* addr, int* sockfd, int port);
+
 
 
 

@@ -1,21 +1,4 @@
 #include "utils.h"
-
-
-int init_udp_server(struct sockaddr_in* addr, int* sockfd, int port) {
-    if ((*sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-        perror("[socket]");
-        return -1;
-    }
-    (*addr).sin_family = AF_INET;
-    (*addr).sin_port = htons(port); // Specify the port as an argument
-    (*addr).sin_addr.s_addr = INADDR_ANY; // Listen on all available interfaces
-
-    if (bind(*sockfd, (struct sockaddr*)addr, sizeof(*addr)) < 0) {
-        perror("[bind]");
-        return -1;
-    }
-    return 0;
-}
 int request(uint16_t opcode, const char* filename, const char* mode, int sockfd, struct sockaddr* addr) {
     //the zero byte
     u_int8_t end_of_file = 0;
@@ -232,73 +215,4 @@ char* build_ack_packet(uint16_t block_number, size_t* packet_size) {
     // No need to adjust offset after this, as we're done
 
     return packet;
-}
-
-int handle_request(char* packet, struct sockaddr_in* client_addr,int sockfd){
-    uint16_t opcode = get_opcode(packet);
-    switch (opcode)
-    {
-    case RRQ:
-        handle_rrq(packet,client_addr,sockfd);
-        break;
-    default:
-        break;
-    }    
-
-}
-int handle_rrq(char* packet, struct sockaddr_in* client_addr, int sockfd) {
-    char buf[516]; 
-
-    char* filename = get_file_name(packet);
-    char* mode = get_mode(packet); //todo : gestion des mode de transfers 
-    size_t packet_size;
-    FILE* requested_file = fopen(filename, "rb");
-
-    if (requested_file == NULL) {
-        
-        char* error_packet = build_error_packet(FILE_NOT_FOUND, "Le fichier est introuvable", &packet_size);
-        if (sendto(sockfd, error_packet, packet_size, 0, (struct sockaddr*)client_addr, sizeof(*client_addr)) == -1) {
-            perror("[sendto]");
-        }
-        free(error_packet); 
-        return -1;
-    }
-
-    char data[512];
-    size_t bytes_read = 0;
-    int block_number = 1;
-    socklen_t len = sizeof(*client_addr);
-
-    while ((bytes_read = fread(data, 1, 512, requested_file)) > 0) {
-        char* data_packet = build_data_packet(block_number++, data, bytes_read, &packet_size);
-        if (sendto(sockfd, data_packet, packet_size, 0, (struct sockaddr*)client_addr, len) == -1) {
-            perror("[sendto]");
-            free(data_packet);
-            fclose(requested_file); 
-            return -1;
-        }
-        free(data_packet);
-
-        // Receive the ACK packet for the current block_number
-        if (recvfrom(sockfd, buf, sizeof(buf), 0, (struct sockaddr*)client_addr, &len) == -1) {
-            perror("[recvfrom]");
-            fclose(requested_file); 
-            return -1;
-        }
-
-        if (get_opcode(buf) != ACK || get_block_number(buf) != block_number - 1) {
-            printf("Unexpected ACK received.\n");
-            fclose(requested_file); 
-            return -1;
-        }
-    }
-
-    fclose(requested_file); 
-    printf("FILE TRANSFERRED WITH SUCCESS\n");
-    return 1;
-}
-
-int handle_wrq(char* packet, struct sockaddr_in* client_addr, int sockfd) {
-    
-   
 }
