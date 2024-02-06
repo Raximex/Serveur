@@ -3,7 +3,9 @@
 static char transfer_mode[9] = "netascii";
 static int sockfd;
 static struct sockaddr_in addr;
-
+void exit_tftp_client(){
+    exit(0);
+}
 static int connect_to_tftp_server(const char* server_ip, int server_port) {
     if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
         perror("[socket]");
