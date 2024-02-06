@@ -1,32 +1,20 @@
 #include "utils.h"
 
 
-int init_udp_server(struct sockaddr_in* addr,int* sockfd){
+int init_udp_server(struct sockaddr_in* addr, int* sockfd, int port) {
     if ((*sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
         perror("[socket]");
         return -1;
     }
-    (*addr).sin_family=AF_INET;
-    (*addr).sin_port=htons(8080);
-    (*addr).sin_addr.s_addr= INADDR_ANY;
+    (*addr).sin_family = AF_INET;
+    (*addr).sin_port = htons(port); // Specify the port as an argument
+    (*addr).sin_addr.s_addr = INADDR_ANY; // Listen on all available interfaces
 
-     if (bind(*sockfd,(struct sockaddr*)addr,sizeof(*addr))< 0) {
+    if (bind(*sockfd, (struct sockaddr*)addr, sizeof(*addr)) < 0) {
         perror("[bind]");
         return -1;
     }
     return 0;
-
-}
-int init_udp_client(struct sockaddr_in* addr,int* sockfd){
-    if ((*sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-        perror("[socket]");
-        return -1;
-    }
-    (*addr).sin_family=AF_INET;
-    (*addr).sin_port=htons(8080);
-    (*addr).sin_addr.s_addr= INADDR_ANY;
-    return 0;
-
 }
 int request(uint16_t opcode, const char* filename, const char* mode, int sockfd, struct sockaddr* addr) {
     //the zero byte
@@ -108,7 +96,70 @@ char* get_error_message(char* packet){
     return error_msg;
 
 }
+uint16_t get_block_number(char* packet){
+    uint16_t block_number;
+    memcpy(&block_number, packet + 2, sizeof(block_number)); // Copie correctement les 2 octets
+    return ntohs(block_number); // Conversion nécessaire
+}
+char* get_data(char* packet){
+    char* data = strdup(packet+4);
+    return data;
 
+}
+void print_data_packet(char* packet){
+    uint16_t opcode = get_opcode(packet);
+    uint16_t block_number = get_block_number(packet);
+    char* data = get_data(packet);
+    printf("%u\n",opcode);
+    printf("%u\n",block_number);
+    printf("%s\n",data);
+    free(data);
+}
+size_t convert_to_netascii(char* buffer) {
+    size_t i, j;
+    size_t input_length = strlen(buffer); 
+    for (i = 0, j = 0; i < input_length; ++i, ++j) {
+        if (buffer[i] == '\n') {
+            buffer[j++] = '\r'; 
+        }
+        buffer[j] = buffer[i];
+    }
+    buffer[j] = '\0'; 
+    return j; 
+}
+int send_ack(int sockfd, const struct sockaddr* dest_addr, socklen_t addrlen, uint16_t block_number) {
+    size_t packet_size;
+    char* ack_packet = build_ack_packet(block_number, &packet_size);
+
+    if (!ack_packet) {
+        return -1; // Failed to build ACK packet
+    }
+
+    size_t bytes_sent = sendto(sockfd, ack_packet, packet_size, 0, dest_addr, addrlen);
+    free(ack_packet); // Free the dynamically allocated ACK packet
+
+    if (bytes_sent < 0) {
+        perror("Failed to send ACK packet");
+        return -1;
+    }
+
+    return 0; // ACK packet sent successfully
+}
+void convert_netascii_to_native(char *data, int *length) {
+    if(strcmp(PLATFORM_NAME, "windows") == 0) {
+        return; // No conversion needed for Windows, as it already uses CR LF.
+    }
+    int i, j;
+    // Convert CR LF to LF for Linux/Unix
+    for (i = 0, j = 0; i < *length; ++i, ++j) {
+        if (data[i] == '\r' && data[i + 1] == '\n') {
+            i++; // Skip CR in CR LF
+        }
+        data[j] = data[i];
+    }
+    *length = j; // Update the length after conversion
+    data[j] = '\0'; // Ensure the result is null-terminated
+}
 char* build_error_packet(uint16_t error_code, char* error_msg,size_t* packet_size) {
     //The zero byte
     u_int8_t end_of_error_msg = 0;
@@ -140,6 +191,49 @@ char* build_error_packet(uint16_t error_code, char* error_msg,size_t* packet_siz
     *packet_size = offset; //assign the size
     return error_packet;
 }
+char* build_data_packet(uint16_t block_number, const char* data, size_t data_length, size_t* packet_size) {
+    *packet_size = 4 + data_length; // Opcode (2 bytes) + Block number (2 bytes) + Data length
+    char* packet = malloc(*packet_size);
+    if (packet == NULL) {
+        perror("malloc");
+        return NULL;
+    }
+
+    uint16_t net_opcode = htons(DATA);
+    uint16_t net_block_number = htons(block_number);
+
+    int offset = 0;
+    memcpy(packet + offset, &net_opcode, sizeof(net_opcode));
+    offset += sizeof(net_opcode);
+
+    memcpy(packet + offset, &net_block_number, sizeof(net_block_number));
+    offset += sizeof(net_block_number);
+
+    memcpy(packet + offset, data, data_length); // No need to adjust offset after this, as we're done
+
+    return packet;
+}
+char* build_ack_packet(uint16_t block_number, size_t* packet_size) {
+    *packet_size = 4; // Opcode (2 bytes) + Block number (2 bytes)
+    char* packet = malloc(*packet_size);
+    if (packet == NULL) {
+        perror("malloc");
+        return NULL;
+    }
+
+    uint16_t net_opcode = htons(ACK);
+    uint16_t net_block_number = htons(block_number);
+
+    int offset = 0;
+    memcpy(packet + offset, &net_opcode, sizeof(net_opcode));
+    offset += sizeof(net_opcode);
+
+    memcpy(packet + offset, &net_block_number, sizeof(net_block_number));
+    // No need to adjust offset after this, as we're done
+
+    return packet;
+}
+
 int handle_request(char* packet, struct sockaddr_in* client_addr,int sockfd){
     uint16_t opcode = get_opcode(packet);
     switch (opcode)
@@ -152,28 +246,59 @@ int handle_request(char* packet, struct sockaddr_in* client_addr,int sockfd){
     }    
 
 }
-int handle_rrq(char* packet,struct sockaddr_in* client_addr,int sockfd){
+int handle_rrq(char* packet, struct sockaddr_in* client_addr, int sockfd) {
+    char buf[516]; 
+
     char* filename = get_file_name(packet);
-    char* mode = get_mode(packet);
-    FILE * requested_file = NULL;
-    if(strcasecmp("netascii",mode)){
-        requested_file = fopen(filename,"r");
-    }
-    else{
-        requested_file = fopen(filename,"rb");
-    }
-    if(requested_file == NULL){
-        // le fichier n'existe pas on crée le Error packet
-        size_t packet_size ;
-        char* error_packet = build_error_packet(FILE_NOT_FOUND,"le fichier est introuvable",&packet_size);
+    char* mode = get_mode(packet); //todo : gestion des mode de transfers 
+    size_t packet_size;
+    FILE* requested_file = fopen(filename, "rb");
+
+    if (requested_file == NULL) {
+        
+        char* error_packet = build_error_packet(FILE_NOT_FOUND, "Le fichier est introuvable", &packet_size);
         if (sendto(sockfd, error_packet, packet_size, 0, (struct sockaddr*)client_addr, sizeof(*client_addr)) == -1) {
             perror("[sendto]");
-            free(error_packet); 
+        }
+        free(error_packet); 
         return -1;
     }
 
-    free(error_packet); 
-    return 1;
+    char data[512];
+    size_t bytes_read = 0;
+    int block_number = 1;
+    socklen_t len = sizeof(*client_addr);
+
+    while ((bytes_read = fread(data, 1, 512, requested_file)) > 0) {
+        char* data_packet = build_data_packet(block_number++, data, bytes_read, &packet_size);
+        if (sendto(sockfd, data_packet, packet_size, 0, (struct sockaddr*)client_addr, len) == -1) {
+            perror("[sendto]");
+            free(data_packet);
+            fclose(requested_file); 
+            return -1;
+        }
+        free(data_packet);
+
+        // Receive the ACK packet for the current block_number
+        if (recvfrom(sockfd, buf, sizeof(buf), 0, (struct sockaddr*)client_addr, &len) == -1) {
+            perror("[recvfrom]");
+            fclose(requested_file); 
+            return -1;
+        }
+
+        if (get_opcode(buf) != ACK || get_block_number(buf) != block_number - 1) {
+            printf("Unexpected ACK received.\n");
+            fclose(requested_file); 
+            return -1;
+        }
     }
+
+    fclose(requested_file); 
+    printf("FILE TRANSFERRED WITH SUCCESS\n");
+    return 1;
+}
+
+int handle_wrq(char* packet, struct sockaddr_in* client_addr, int sockfd) {
     
+   
 }

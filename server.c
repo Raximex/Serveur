@@ -7,7 +7,7 @@ int main(int argc, char**argv)
     char buf[MAX_BLOCK_SIZE];
     struct sockaddr_in addr,client_addr;
 
-    if(init_udp_server(&addr,&sockfd) == -1){
+    if(init_udp_server(&addr,&sockfd,8080) == -1){
         printf("[init_udp_socket] : erreur\n");
     }
     socklen_t len = sizeof(addr);

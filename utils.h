@@ -10,6 +10,13 @@
 #include <arpa/inet.h> 
 #define PORT 999999
 #define MAX_BLOCK_SIZE 516
+#if defined(_WIN32) || defined(_WIN64)
+    // Windows (32-bit and 64-bit)
+    #define PLATFORM_NAME "windows"
+#elif defined(__unix__) || defined(__unix)
+    // UNIX
+    #define PLATFORM_NAME "unix"
+#endif
 //Remarques : htons ? 
 
 /**
@@ -103,21 +110,12 @@ enum error {
  * 
  * @param addr Pointer to struct sockaddr_in where server address and port are specified.
  * @param sockfd Pointer to an integer where the socket file descriptor will be stored.
+ * @param port Port number to bind the server socket to.
  * @return Returns 0 on success, -1 on failure with an error message printed to stderr.
  */
-int init_udp_client(struct sockaddr_in*,int* sockfd);
+int init_udp_server(struct sockaddr_in* addr, int* sockfd, int port);
 
-//--------------------------------------------------------------------------------------------------------------------------------------------------------------
-/**
- * @brief Initializes a UDP client socket.
- * 
- * This function creates a UDP socket for the client. The socket is not bound to a specific address or port.
- * 
- * @param addr Pointer to struct sockaddr_in where client address and port are specified. Not used in this function but included for symmetry with server initialization.
- * @param sockfd Pointer to an integer where the socket file descriptor will be stored.
- * @return Returns 0 on success, -1 on failure with an error message printed to stderr.
- */
-int init_udp_server(struct sockaddr_in*,int* sockfd);
+
 
 //--------------------------------------------------------------------------------------------------------------------------------------------------------------
 /**
@@ -211,15 +209,65 @@ void print_error_packet(char* packet);
  */
 char* build_error_packet(uint16_t error_code, char* error_msg,size_t* packet_size);
 
+//--------------------------------------------------------------------------------------------------------------------------------------------------------------
+/**
+ * @brief Converts text from Unix/Linux line endings (LF) to Netascii line endings (CR LF).
+ *
+ * @param buffer A pointer to the input text buffer to be converted. This buffer is expected
+ *              to contain text using Unix/Linux line endings (LF).
+ *
+ * @return The length of the converted text. This length may be
+ *         greater than the input length if line endings were converted.
+ */
+size_t convert_to_netascii(char* buffer);
+
+//--------------------------------------------------------------------------------------------------------------------------------------------------------------
+/**
+ * @brief Converts text from Netascii format to the native end-of-line format.
+ * 
+ * @param data The Netascii text data to be converted, modified in place.
+ * @param length Pointer to an integer representing the length of the input data. The function updates this value to reflect the length of the converted text.
+ * @return Nothing.
+ */
+
+//--------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+/**
+ * @brief TODO
+ * 
+ * @param data TODO
+ * @param length TODO
+ * @return TODO.
+ */
+uint16_t get_block_number(char* packet);
+
+//--------------------------------------------------------------------------------------------------------------------------------------------------------------
+/**
+ * @brief TODO
+ * 
+ * @param data TODO
+ * @param length TODO
+ * @return TODO.
+ */
+char* get_data(char* packet);
+//--------------------------------------------------------------------------------------------------------------------------------------------------------------
+/**
+ * @brief TODO
+ * 
+ * @param data TODO
+ * @param length TODO
+ * @return TODO.
+ */
+void print_data_packet(char* packet);
 //TODO
 int handle_request(char* packet, struct sockaddr_in* client_addr,int sockfd);
 
 //TODO : gérer les modes netascii , octet et email
 int handle_rrq(char* packet,struct sockaddr_in* client_addr,int sockfd);
 
-
-
-
+char* build_ack_packet(uint16_t block_number, size_t* packet_size);
+char* build_data_packet(uint16_t block_number, const char* data, size_t data_length, size_t* packet_size);
+int send_ack(int sockfd, const struct sockaddr* dest_addr, socklen_t addrlen, uint16_t block_number);
 
 
 
