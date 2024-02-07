@@ -140,7 +140,12 @@ void receive_file(const char* filename) {
     request(RRQ, filename, transfer_mode, sockfd, (struct sockaddr*)&addr);
     char buf[516];
     size_t packet_size;
-    FILE* requested_file = fopen("new.txt", "wb");//pour test : il faut le remplacer par filename
+    char cwd[100];
+    getcwd(cwd, sizeof(cwd));
+    strcat(cwd, "/");
+    strcat(cwd, filename);
+
+    FILE *requested_file = fopen(cwd, "wb"); // pour test : il faut le remplacer par filename
     if (!requested_file) {
         perror("Failed to open file");
         return;
@@ -221,12 +226,10 @@ int main(int argc, char const* argv[]) {
     }
    char command[100];
 
-    while (1) {
-        printf("tftp> ");
-        if (scanf("%99s", command) == EOF) {
-            break; // Exit loop if end of input is reached
-        }
-        process_command(command);
-    }
-
+   printf("tftp> ");
+   if (scanf("%99s", command) == EOF)
+   {
+       return 1; // Exit loop if end of input is reached
+   }
+   process_command(command);
 }
