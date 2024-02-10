@@ -7,7 +7,9 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <unistd.h>
-#include <arpa/inet.h> 
+#include <arpa/inet.h>
+#include <sys/time.h>
+#include <errno.h>
 #define PORT 999999
 #define MAX_BLOCK_SIZE 516
 #if defined(_WIN32) || defined(_WIN64)

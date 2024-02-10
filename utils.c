@@ -1,9 +1,9 @@
 #include "utils.h"
 int request(uint16_t opcode, const char* filename, const char* mode, int sockfd, struct sockaddr* addr) {
-    //the zero byte
+    // l'octet à 0
     u_int8_t end_of_file = 0;
     int offset = 0;
-    // dynamically allocate the string
+    // Allocation mémoire
     char* packet = malloc(strlen(filename) + strlen(mode) + 4 + 2);
     if (packet == NULL) {
         perror("malloc");

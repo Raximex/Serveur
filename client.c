@@ -1,6 +1,6 @@
 #include "client.h"
-#define DEBUG 0
-static char transfer_mode[9] = "netascii";
+#define DEBUG 1
+static char transfer_mode[9] = "octet";
 static int sockfd;
 static struct sockaddr_in addr;
 static void exit_tftp_client(){
@@ -66,8 +66,17 @@ static void print_help() {
     );
 }
 static int connect_to_tftp_server(const char* server_ip, int server_port) {
+
     if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
         perror("[socket]");
+        return -1;
+    }
+    struct timeval tv;
+    tv.tv_sec = 5;
+    tv.tv_usec = 0;
+    if ((setsockopt(sockfd, 0, SO_RCVTIMEO, &tv, sizeof tv)) == -1)
+    {
+        perror("[Socket option]");
         return -1;
     }
     addr.sin_family = AF_INET;
@@ -80,7 +89,11 @@ static void set_file_transfer_mode(const char* mode){
         strcpy(transfer_mode,mode);
 }
 static void send_file(const char* filename) {
-    FILE* requested_file = fopen(filename, "rb");
+    FILE *requested_file;
+    if (strcmp(transfer_mode, "netascii") == 0)
+        requested_file = fopen(filename, "r");
+    if (strcmp(transfer_mode, "octet") == 0)
+        requested_file = fopen(filename, "rb");
     if (requested_file == NULL) {
         perror("Failed to open file");
         return; 
@@ -96,6 +109,7 @@ static void send_file(const char* filename) {
 
     // Wait for the initial ACK for the WRQ
     size_t bytes_received = recvfrom(sockfd, buf, sizeof(buf), 0, (struct sockaddr*)&addr, &len);
+
     if (bytes_received == -1) {
         perror("[recvfrom]");
         fclose(requested_file);
@@ -111,24 +125,35 @@ static void send_file(const char* filename) {
     while ((bytes_read = fread(buf, 1, 512, requested_file)) > 0) {
         block_number++;
         data_packet = build_data_packet(block_number, buf, bytes_read, &packet_size);
-        if (sendto(sockfd, data_packet, packet_size, 0, (struct sockaddr*)&addr, len) == -1) {
+        while (sendto(sockfd, data_packet, packet_size, 0, (struct sockaddr *)&addr, len) == -1) // renvoi du paquet jusqu'à ce que ca reussisse
+        {
+            if (errno != EAGAIN && errno != EWOULDBLOCK) // si envoi paquet fail + timeout alors il y a une erreur inattendue
+            {
+                perror("Time out et erreur paquet");
+                return -1;
+            }
             perror("[sendto]");
             free(data_packet); // Free the allocated memory
             fclose(requested_file); // Close the file
             return;
         }
         free(data_packet); // Free the allocated memory after sending
-
-        // Receive the ACK packet
-        bytes_received = recvfrom(sockfd, buf, sizeof(buf), 0, (struct sockaddr*)&addr, &len);
-        if (bytes_received == -1) {
+                           // while (1)
+        //{
+        //  Receive the ACK packet
+        bytes_received = recvfrom(sockfd, buf, sizeof(buf), 0, (struct sockaddr *)&addr, &len);
+        if (bytes_received == -1)
+        {
             perror("[recvfrom]");
             break;
         }
-
-        if (get_opcode(buf) == ACK && get_block_number(buf) == block_number && DEBUG) {
+        //  }
+        if (get_opcode(buf) == ACK && get_block_number(buf) == block_number && DEBUG)
+        {
             printf("Received ACK for block %d\n", block_number);
-        } else if (get_opcode(buf) == ERROR) {
+        }
+        else if (get_opcode(buf) == ERROR)
+        {
             printf("[ERROR] Code = %d : Message = %s\n", get_error_code(buf), get_error_message(buf));
             break; // Exit the loop on error
         }
@@ -144,9 +169,13 @@ void receive_file(const char* filename) {
     getcwd(cwd, sizeof(cwd));
     strcat(cwd, "/");
     strcat(cwd, filename);
-
-    FILE *requested_file = fopen(cwd, "wb"); // pour test : il faut le remplacer par filename
-    if (!requested_file) {
+    FILE *requested_file;
+    if (strcmp(transfer_mode, "netascii") == 0)
+        requested_file = fopen(cwd, "w"); // pour test : il faut le remplacer par filename
+    if (strcmp(transfer_mode, "octet") == 0)
+        requested_file = fopen(cwd, "wb");
+    if (!requested_file)
+    {
         perror("Failed to open file");
         return;
     }
@@ -167,9 +196,8 @@ void receive_file(const char* filename) {
             }
             break;
         }
-        fwrite(get_data(buf), 1, bytes_received - 4, requested_file); // 
-        send_ack(sockfd,(struct sockaddr*)&addr,len,block_number);
-
+        fwrite(get_data(buf), 1, bytes_received - 4, requested_file); //
+                                                                      // send_ack(sockfd, (struct sockaddr *)&addr, len, block_number);
         block_number++;
         // Check if this is the last data block
         if (bytes_received < 516) {
@@ -224,12 +252,7 @@ int main(int argc, char const* argv[]) {
     if (connect_to_tftp_server("127.0.0.1",8080) == -1) {
         printf("[connect_to_tftp_server] : erreur");
     }
-   char command[100];
-
-   printf("tftp> ");
-   if (scanf("%99s", command) == EOF)
-   {
-       return 1; // Exit loop if end of input is reached
-   }
-   process_command(command);
+    // send_file("client.h");
+    receive_file("new.txt");
+    char command[100];
 }
